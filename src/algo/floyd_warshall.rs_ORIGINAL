@@ -106,7 +106,16 @@ where
         dist[graph.to_index(node)][graph.to_index(node)] = K::default();
     }
 
-    bar____EXTRACT_THIS(num_of_nodes, dist);
+    for k in 0..num_of_nodes {
+        for i in 0..num_of_nodes {
+            for j in 0..num_of_nodes {
+                let (result, overflow) = dist[i][k].overflowing_add(dist[k][j]);
+                if !overflow && dist[i][j] > result {
+                    dist[i][j] = result;
+                }
+            }
+        }
+    }
 
     // value less than 0(default value) indicates a negative cycle
     for i in 0..num_of_nodes {
@@ -125,17 +134,4 @@ where
     }
 
     Ok(distance_map)
-}
-
-fn bar____EXTRACT_THIS<K>(num_of_nodes: usize, dist: Vec<Vec<K>>) where K: BoundedMeasure + Copy {
-    for k in 0..num_of_nodes {
-        for i in 0..num_of_nodes {
-            for j in 0..num_of_nodes {
-                let (result, overflow) = dist[i][k].overflowing_add(dist[k][j]);
-                if !overflow && dist[i][j] > result {
-                    dist[i][j] = result;
-                }
-            }
-        }
-    }
 }
