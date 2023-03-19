@@ -1,0 +1,17 @@
+(&mut self.iter)
+                .filter_map(move |&(n, dir)| {
+                    if dir == self_dir || n == start_node {
+                        Some(n)
+                    } else {
+                        None
+                    }
+                })
+(&mut self.iter)
+                .filter_map(move |&(n, dir)| {
+                    if dir == self_dir || n == start_node {
+                        Some(n)
+                    } else {
+                        None
+                    }
+                })
+                .next()
