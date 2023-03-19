@@ -181,17 +181,17 @@ where
                 g.to_index(edge.source()),
                 EDGE[g.is_directed() as usize],
                 g.to_index(edge.target()),
-            )?;
+            ).unwrap();
             if !self.config.EdgeNoLabel {
-                write!(f, "label = \"")?;
+                write!(f, "label = \"").unwrap();
                 if self.config.EdgeIndexLabel {
-                    write!(f, "{}", i)?;
+                    write!(f, "{}", i).unwrap();
                 } else {
-                    Escaped(FnFmt(edge.weight(), &edge_fmt)).fmt(f)?;
+                    Escaped(FnFmt(edge.weight(), &edge_fmt)).fmt(f).unwrap();
                 }
-                write!(f, "\" ")?;
+                write!(f, "\" ").unwrap();
             }
-            writeln!(f, "{}]", (self.get_edge_attributes)(g, edge))?;
+            writeln!(f, "{}]", (self.get_edge_attributes)(g, edge)).unwrap();
         }
 
         if !self.config.GraphContentOnly {
