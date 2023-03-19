@@ -1,6 +1,6 @@
 //! Simple graphviz dot file format output.
 
-use std::fmt::{self, Display, Formatter, Write};
+use std::fmt::{self, Display, Write};
 
 use crate::visit::{
     EdgeRef, GraphProp, IntoEdgeReferences, IntoNodeReferences, NodeIndexable, NodeRef,
@@ -173,15 +173,6 @@ where
             writeln!(f, "{}]", (self.get_node_attributes)(g, node))?;
         }
         // output all edges
-        self.bar____EXTRACT_THIS(f, edge_fmt, g);
-
-        if !self.config.GraphContentOnly {
-            writeln!(f, "}}")?;
-        }
-        Ok(())
-    }
-
-    fn bar____EXTRACT_THIS<EF>(&self, f: &mut Formatter<'a>, edge_fmt: EF, g: G) where EF: Fn(&G::EdgeWeight, &mut fmt::Formatter) -> fmt::Result {
         for (i, edge) in g.edge_references().enumerate() {
             write!(
                 f,
@@ -202,6 +193,11 @@ where
             }
             writeln!(f, "{}]", (self.get_edge_attributes)(g, edge)).unwrap();
         }
+
+        if !self.config.GraphContentOnly {
+            writeln!(f, "}}")?;
+        }
+        Ok(())
     }
 }
 
