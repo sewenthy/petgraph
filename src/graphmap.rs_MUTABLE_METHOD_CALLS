@@ -1,0 +1,2 @@
+self.inner
+            .nth(n)
