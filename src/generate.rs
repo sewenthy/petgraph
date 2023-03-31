@@ -61,13 +61,7 @@ impl<Ty: EdgeType> Generator<Ty> {
     /// For a graph of *k* vertices there are *e = k²* possible edges and
     /// *2<sup>k<sup>2</sup></sup>* graphs.
     pub fn all(nodes: usize, allow_selfloops: bool) -> Self {
-        let scale = if Ty::is_directed() { 1 } else { 2 };
-        let nedges = if allow_selfloops {
-            (nodes * nodes - nodes) / scale + nodes
-        } else {
-            (nodes * nodes) / scale - nodes
-        };
-        assert!(nedges < 64);
+        let nedges = Self::bar(nodes, allow_selfloops);
         Generator {
             acyclic: false,
             selfloops: allow_selfloops,
@@ -76,6 +70,17 @@ impl<Ty: EdgeType> Generator<Ty> {
             bits: !0,
             g: Graph::with_capacity(nodes, nedges),
         }
+    }
+
+    fn bar(nodes: usize, allow_selfloops: bool) -> usize {
+        let scale = if Ty::is_directed() { 1 } else { 2 };
+        let nedges = if allow_selfloops {
+            (nodes * nodes - nodes) / scale + nodes
+        } else {
+            (nodes * nodes) / scale - nodes
+        };
+        assert!(nedges < 64);
+        nedges
     }
 
     fn state_to_graph(&mut self) -> &Graph<(), (), Ty> {
