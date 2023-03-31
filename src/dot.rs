@@ -92,6 +92,54 @@ where
             config,
         }
     }
+
+    fn fun_name(&self, f: &mut fmt::Formatter, node_fmt: fn, edge_fmt: fn) -> Result<(), fmt::Error> {
+        let g = self.graph;
+        if !self.config.GraphContentOnly {
+            writeln!(f, "{} {{", TYPE[g.is_directed() as usize]).unwrap();
+        }
+
+        // output all labels
+        for node in g.node_references() {
+            write!(f, "{}{} [ ", INDENT, g.to_index(node.id()),).unwrap();
+            if !self.config.NodeNoLabel {
+                write!(f, "label = \"").unwrap();
+                if self.config.NodeIndexLabel {
+                    write!(f, "{}", g.to_index(node.id())).unwrap();
+                } else {
+                    Escaped(FnFmt(node.weight(), &node_fmt)).fmt(f).unwrap();
+                }
+                write!(f, "\" ").unwrap();
+            }
+            writeln!(f, "{}]", (self.get_node_attributes)(g, node)).unwrap();
+        }
+        // output all edges
+        for (i, edge) in g.edge_references().enumerate() {
+            write!(
+                f,
+                "{}{} {} {} [ ",
+                INDENT,
+                g.to_index(edge.source()),
+                EDGE[g.is_directed() as usize],
+                g.to_index(edge.target()),
+            ).unwrap();
+            if !self.config.EdgeNoLabel {
+                write!(f, "label = \"").unwrap();
+                if self.config.EdgeIndexLabel {
+                    write!(f, "{}", i).unwrap();
+                } else {
+                    Escaped(FnFmt(edge.weight(), &edge_fmt)).fmt(f).unwrap();
+                }
+                write!(f, "\" ").unwrap();
+            }
+            writeln!(f, "{}]", (self.get_edge_attributes)(g, edge)).unwrap();
+        }
+
+        if !self.config.GraphContentOnly {
+            writeln!(f, "}}").unwrap();
+        }
+        Ok(())
+    }
 }
 
 /// `Dot` configuration.
@@ -221,51 +269,7 @@ where
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let node_fmt = fmt::Debug::fmt;
         let edge_fmt = fmt::Debug::fmt;
-        let g = self.graph;
-        if !self.config.GraphContentOnly {
-            writeln!(f, "{} {{", TYPE[g.is_directed() as usize]).unwrap();
-        }
-
-        // output all labels
-        for node in g.node_references() {
-            write!(f, "{}{} [ ", INDENT, g.to_index(node.id()),).unwrap();
-            if !self.config.NodeNoLabel {
-                write!(f, "label = \"").unwrap();
-                if self.config.NodeIndexLabel {
-                    write!(f, "{}", g.to_index(node.id())).unwrap();
-                } else {
-                    Escaped(FnFmt(node.weight(), &node_fmt)).fmt(f).unwrap();
-                }
-                write!(f, "\" ").unwrap();
-            }
-            writeln!(f, "{}]", (self.get_node_attributes)(g, node)).unwrap();
-        }
-        // output all edges
-        for (i, edge) in g.edge_references().enumerate() {
-            write!(
-                f,
-                "{}{} {} {} [ ",
-                INDENT,
-                g.to_index(edge.source()),
-                EDGE[g.is_directed() as usize],
-                g.to_index(edge.target()),
-            ).unwrap();
-            if !self.config.EdgeNoLabel {
-                write!(f, "label = \"").unwrap();
-                if self.config.EdgeIndexLabel {
-                    write!(f, "{}", i).unwrap();
-                } else {
-                    Escaped(FnFmt(edge.weight(), &edge_fmt)).fmt(f).unwrap();
-                }
-                write!(f, "\" ").unwrap();
-            }
-            writeln!(f, "{}]", (self.get_edge_attributes)(g, edge)).unwrap();
-        }
-
-        if !self.config.GraphContentOnly {
-            writeln!(f, "}}").unwrap();
-        }
-        Ok(())
+        self.fun_name(f, node_fmt, edge_fmt)
     }
 }
 
