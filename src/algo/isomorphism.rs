@@ -72,18 +72,22 @@ mod state {
             // update T0 & T1 ins/outs
             // T0out: Node in G0 not in M0 but successor of a node in M0.
             // st.out[0]: Node either in M0 or successor of M0
-            for ix in self.graph.neighbors_directed(from, Outgoing) {
-                if self.out[self.graph.to_index(ix)] == 0 {
-                    self.out[self.graph.to_index(ix)] = self.generation;
-                    self.out_size += 1;
-                }
-            }
+            self.fun_name(from);
             if self.graph.is_directed() {
                 for ix in self.graph.neighbors_directed(from, Incoming) {
                     if self.ins[self.graph.to_index(ix)] == 0 {
                         self.ins[self.graph.to_index(ix)] = self.generation;
                         self.ins_size += 1;
                     }
+                }
+            }
+        }
+
+        fn fun_name(&mut self, from: <G as GraphBase>::NodeId) {
+            for ix in self.graph.neighbors_directed(from, Outgoing) {
+                if self.out[self.graph.to_index(ix)] == 0 {
+                    self.out[self.graph.to_index(ix)] = self.generation;
+                    self.out_size += 1;
                 }
             }
         }
