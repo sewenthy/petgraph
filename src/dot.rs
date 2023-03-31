@@ -1,6 +1,6 @@
 //! Simple graphviz dot file format output.
 
-use std::fmt::{self, Display, Write};
+use std::fmt::{self, Display, Error, Formatter, Write};
 
 use crate::visit::{
     EdgeRef, GraphProp, IntoEdgeReferences, IntoNodeReferences, NodeIndexable, NodeRef,
@@ -221,6 +221,13 @@ where
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let node_fmt = fmt::Debug::fmt;
         let edge_fmt = fmt::Debug::fmt;
+
+        self.bar(f, &node_fmt, &edge_fmt)
+    }
+}
+
+impl<'a, G> Dot<'a, G> where G: GraphProp + IntoEdgeReferences + IntoNodeReferences + NodeIndexable {
+    fn bar(&self, f: &mut Formatter, node_fmt: &fn(&_, &mut Formatter) -> Result, edge_fmt: &fn(&_, &mut Formatter) -> Result) -> Result<(), Error> {
         let g = self.graph;
         if !self.config.GraphContentOnly {
             writeln!(f, "{} {{", TYPE[g.is_directed() as usize]).unwrap();
@@ -228,7 +235,7 @@ where
 
         // output all labels
         for node in g.node_references() {
-            write!(f, "{}{} [ ", INDENT, g.to_index(node.id()),).unwrap();
+            write!(f, "{}{} [ ", INDENT, g.to_index(node.id()), ).unwrap();
             if !self.config.NodeNoLabel {
                 write!(f, "label = \"").unwrap();
                 if self.config.NodeIndexLabel {
