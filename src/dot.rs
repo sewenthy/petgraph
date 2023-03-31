@@ -173,6 +173,15 @@ where
             writeln!(f, "{}]", (self.get_node_attributes)(g, node))?;
         }
         // output all edges
+        self.fun_name(g, f, edge_fmt);
+
+        if !self.config.GraphContentOnly {
+            writeln!(f, "}}")?;
+        }
+        Ok(())
+    }
+
+    fn fun_name<G, EF>(&self, g: G, f: &mut fmt::Formatter, edge_fmt: EF) where G: IntoNodeReferences + IntoEdgeReferences + NodeIndexable + GraphProp, EF: Fn(&G::EdgeWeight, &mut fmt::Formatter) -> fmt::Result {
         for (i, edge) in g.edge_references().enumerate() {
             write!(
                 f,
@@ -193,11 +202,6 @@ where
             }
             writeln!(f, "{}]", (self.get_edge_attributes)(g, edge)).unwrap();
         }
-
-        if !self.config.GraphContentOnly {
-            writeln!(f, "}}")?;
-        }
-        Ok(())
     }
 }
 
