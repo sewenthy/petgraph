@@ -783,14 +783,20 @@ where
     }
 
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        self.inner
-            .nth(n)
-            .map(|(&(n1, n2), weight)| (n1, n2, weight))
+        self.bar(n)
     }
 
     fn last(self) -> Option<Self::Item> {
         self.inner
             .last()
+            .map(|(&(n1, n2), weight)| (n1, n2, weight))
+    }
+}
+
+impl<'a, N, E, Ty> AllEdges<'a, N, E, Ty> where E: 'a, N: 'a + NodeTrait, Ty: EdgeType {
+    fn bar(&mut self, n: usize) -> Option<(N, N, &E)> {
+        self.inner
+            .nth(n)
             .map(|(&(n1, n2), weight)| (n1, n2, weight))
     }
 }
