@@ -663,15 +663,7 @@ where
         if Ty::is_directed() {
             let self_dir = self.dir;
             let start_node = self.start_node;
-            (&mut self.iter)
-                .filter_map(move |&(n, dir)| {
-                    if dir == self_dir || n == start_node {
-                        Some(n)
-                    } else {
-                        None
-                    }
-                })
-                .next()
+            self.bar(self_dir, start_node)
         } else {
             self.iter.next().map(|&(n, _)| n)
         }
@@ -683,6 +675,20 @@ where
         } else {
             (lower, upper)
         }
+    }
+}
+
+impl<'a, N, Ty> NeighborsDirected<'a, N, Ty> where N: NodeTrait, Ty: EdgeType {
+    fn bar(&mut self, self_dir: Direction, start_node: N) -> Option<N> {
+        (&mut self.iter)
+            .filter_map(move |&(n, dir)| {
+                if dir == self_dir || n == start_node {
+                    Some(n)
+                } else {
+                    None
+                }
+            })
+            .next()
     }
 }
 
