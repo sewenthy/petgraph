@@ -1,5 +1,7 @@
-use std::convert::TryFrom;
-
+use self::semantic::EdgeMatcher;
+use self::semantic::NoSemanticMatch;
+use self::semantic::NodeMatcher;
+use self::state::Vf2State;
 use crate::data::DataMap;
 use crate::visit::EdgeCount;
 use crate::visit::EdgeRef;
@@ -10,38 +12,30 @@ use crate::visit::IntoEdgesDirected;
 use crate::visit::IntoNeighborsDirected;
 use crate::visit::NodeCompactIndexable;
 use crate::{Incoming, Outgoing};
-
-use self::semantic::EdgeMatcher;
-use self::semantic::NoSemanticMatch;
-use self::semantic::NodeMatcher;
-use self::state::Vf2State;
-
+use std::convert::TryFrom;
 mod state {
     use super::*;
-
     #[derive(Debug)]
-    // TODO: make mapping generic over the index type of the other graph.
     pub struct Vf2State<'a, G: GetAdjacencyMatrix> {
-        /// A reference to the graph this state was built from.
+        #[doc = " A reference to the graph this state was built from."]
         pub graph: &'a G,
-        /// The current mapping M(s) of nodes from G0 → G1 and G1 → G0,
-        /// `usize::MAX` for no mapping.
+        #[doc = " The current mapping M(s) of nodes from G0 → G1 and G1 → G0,"]
+        #[doc = " `usize::MAX` for no mapping."]
         pub mapping: Vec<usize>,
-        /// out[i] is non-zero if i is in either M_0(s) or Tout_0(s)
-        /// These are all the next vertices that are not mapped yet, but
-        /// have an outgoing edge from the mapping.
+        #[doc = " out[i] is non-zero if i is in either M_0(s) or Tout_0(s)"]
+        #[doc = " These are all the next vertices that are not mapped yet, but"]
+        #[doc = " have an outgoing edge from the mapping."]
         out: Vec<usize>,
-        /// ins[i] is non-zero if i is in either M_0(s) or Tin_0(s)
-        /// These are all the incoming vertices, those not mapped yet, but
-        /// have an edge from them into the mapping.
-        /// Unused if graph is undirected -- it's identical with out in that case.
+        #[doc = " ins[i] is non-zero if i is in either M_0(s) or Tin_0(s)"]
+        #[doc = " These are all the incoming vertices, those not mapped yet, but"]
+        #[doc = " have an edge from them into the mapping."]
+        #[doc = " Unused if graph is undirected -- it's identical with out in that case."]
         ins: Vec<usize>,
         pub out_size: usize,
         pub ins_size: usize,
         pub adjacency_matrix: G::AdjMatrix,
         generation: usize,
     }
-
     impl<'a, G> Vf2State<'a, G>
     where
         G: GetAdjacencyMatrix + GraphProp + NodeCompactIndexable + IntoNeighborsDirected,
@@ -59,20 +53,15 @@ mod state {
                 generation: 0,
             }
         }
-
-        /// Return **true** if we have a complete mapping
+        #[doc = " Return **true** if we have a complete mapping"]
         pub fn is_complete(&self) -> bool {
             self.generation == self.mapping.len()
         }
-
-        /// Add mapping **from** <-> **to** to the state.
+        #[doc = " Add mapping **from** <-> **to** to the state."]
         pub fn push_mapping(&mut self, from: G::NodeId, to: usize) {
             self.generation += 1;
             self.mapping[self.graph.to_index(from)] = to;
-            // update T0 & T1 ins/outs
-            // T0out: Node in G0 not in M0 but successor of a node in M0.
-            // st.out[0]: Node either in M0 or successor of M0
-            self.bar____EXTRACT_THIS(from);
+            self.bar(&from);
             if self.graph.is_directed() {
                 for ix in self.graph.neighbors_directed(from, Incoming) {
                     if self.ins[self.graph.to_index(ix)] == 0 {
@@ -82,22 +71,17 @@ mod state {
                 }
             }
         }
-
-        fn bar____EXTRACT_THIS(&mut self, from: <G as GraphBase>::NodeId) {
-            for ix in self.graph.neighbors_directed(from, Outgoing) {
+        fn bar<'lt0>(&mut self, from: &'lt0 <G as GraphBase>::NodeId) {
+            for ix in self.graph.neighbors_directed((*from), Outgoing) {
                 if self.out[self.graph.to_index(ix)] == 0 {
                     self.out[self.graph.to_index(ix)] = self.generation;
                     self.out_size += 1;
                 }
             }
         }
-
-        /// Restore the state to before the last added mapping
+        #[doc = " Restore the state to before the last added mapping"]
         pub fn pop_mapping(&mut self, from: G::NodeId) {
-            // undo (n, m) mapping
             self.mapping[self.graph.to_index(from)] = std::usize::MAX;
-
-            // unmark in ins and outs
             for ix in self.graph.neighbors_directed(from, Outgoing) {
                 if self.out[self.graph.to_index(ix)] == self.generation {
                     self.out[self.graph.to_index(ix)] = 0;
@@ -112,11 +96,9 @@ mod state {
                     }
                 }
             }
-
             self.generation -= 1;
         }
-
-        /// Find the next (least) node in the Tout set.
+        #[doc = " Find the next (least) node in the Tout set."]
         pub fn next_out_index(&self, from_index: usize) -> Option<usize> {
             self.out[from_index..]
                 .iter()
@@ -126,8 +108,7 @@ mod state {
                 })
                 .map(|(index, _)| index)
         }
-
-        /// Find the next (least) node in the Tin set.
+        #[doc = " Find the next (least) node in the Tin set."]
         pub fn next_in_index(&self, from_index: usize) -> Option<usize> {
             if !self.graph.is_directed() {
                 return None;
@@ -140,8 +121,7 @@ mod state {
                 })
                 .map(|(index, _)| index)
         }
-
-        /// Find the next (least) node in the N - M set.
+        #[doc = " Find the next (least) node in the N - M set."]
         pub fn next_rest_index(&self, from_index: usize) -> Option<usize> {
             self.mapping[from_index..]
                 .iter()
@@ -151,17 +131,13 @@ mod state {
         }
     }
 }
-
 mod semantic {
     use super::*;
-
     pub struct NoSemanticMatch;
-
     pub trait NodeMatcher<G0: GraphBase, G1: GraphBase> {
         fn enabled() -> bool;
         fn eq(&mut self, _g0: &G0, _g1: &G1, _n0: G0::NodeId, _n1: G1::NodeId) -> bool;
     }
-
     impl<G0: GraphBase, G1: GraphBase> NodeMatcher<G0, G1> for NoSemanticMatch {
         #[inline]
         fn enabled() -> bool {
@@ -172,7 +148,6 @@ mod semantic {
             true
         }
     }
-
     impl<G0, G1, F> NodeMatcher<G0, G1> for F
     where
         G0: GraphBase + DataMap,
@@ -192,7 +167,6 @@ mod semantic {
             }
         }
     }
-
     pub trait EdgeMatcher<G0: GraphBase, G1: GraphBase> {
         fn enabled() -> bool;
         fn eq(
@@ -203,7 +177,6 @@ mod semantic {
             e1: (G1::NodeId, G1::NodeId),
         ) -> bool;
     }
-
     impl<G0: GraphBase, G1: GraphBase> EdgeMatcher<G0, G1> for NoSemanticMatch {
         #[inline]
         fn enabled() -> bool {
@@ -220,7 +193,6 @@ mod semantic {
             true
         }
     }
-
     impl<G0, G1, F> EdgeMatcher<G0, G1> for F
     where
         G0: GraphBase + DataMap + IntoEdgesDirected,
@@ -255,17 +227,14 @@ mod semantic {
         }
     }
 }
-
 mod matching {
     use super::*;
-
     #[derive(Copy, Clone, PartialEq, Debug)]
     enum OpenList {
         Out,
         In,
         Other,
     }
-
     #[derive(Clone, PartialEq, Debug)]
     enum Frame<G0, G1>
     where
@@ -282,7 +251,6 @@ mod matching {
             open_list: OpenList,
         },
     }
-
     fn is_feasible<G0, G1, NM, EM>(
         st: &mut (Vf2State<'_, G0>, Vf2State<'_, G1>),
         nodes: (G0::NodeId, G1::NodeId),
@@ -296,29 +264,27 @@ mod matching {
         EM: EdgeMatcher<G0, G1>,
     {
         macro_rules! field {
-            ($x:ident,     0) => {
+            ($ x : ident , 0) => {
                 $x.0
             };
-            ($x:ident,     1) => {
+            ($ x : ident , 1) => {
                 $x.1
             };
-            ($x:ident, 1 - 0) => {
+            ($ x : ident , 1 - 0) => {
                 $x.1
             };
-            ($x:ident, 1 - 1) => {
+            ($ x : ident , 1 - 1) => {
                 $x.0
             };
         }
-
         macro_rules! r_succ {
-            ($j:tt) => {{
+            ($ j : tt) => {{
                 let mut succ_count = 0;
                 for n_neigh in field!(st, $j)
                     .graph
                     .neighbors_directed(field!(nodes, $j), Outgoing)
                 {
                     succ_count += 1;
-                    // handle the self loop case; it's not in the mapping (yet)
                     let m_neigh = if field!(nodes, $j) != n_neigh {
                         field!(st, $j).mapping[field!(st, $j).graph.to_index(n_neigh)]
                     } else {
@@ -339,16 +305,14 @@ mod matching {
                 succ_count
             }};
         }
-
         macro_rules! r_pred {
-            ($j:tt) => {{
+            ($ j : tt) => {{
                 let mut pred_count = 0;
                 for n_neigh in field!(st, $j)
                     .graph
                     .neighbors_directed(field!(nodes, $j), Incoming)
                 {
                     pred_count += 1;
-                    // the self loop case is handled in outgoing
                     let m_neigh = field!(st, $j).mapping[field!(st, $j).graph.to_index(n_neigh)];
                     if m_neigh == std::usize::MAX {
                         continue;
@@ -365,40 +329,18 @@ mod matching {
                 pred_count
             }};
         }
-
-        // Check syntactic feasibility of mapping by ensuring adjacencies
-        // of nx map to adjacencies of mx.
-        //
-        // nx == map to => mx
-        //
-        // R_succ
-        //
-        // Check that every neighbor of nx is mapped to a neighbor of mx,
-        // then check the reverse, from mx to nx. Check that they have the same
-        // count of edges.
-        //
-        // Note: We want to check the lookahead measures here if we can,
-        // R_out: Equal for G0, G1: Card(Succ(G, n) ^ Tout); for both Succ and Pred
-        // R_in: Same with Tin
-        // R_new: Equal for G0, G1: Ñ n Pred(G, n); both Succ and Pred,
-        //      Ñ is G0 - M - Tin - Tout
-        // last attempt to add these did not speed up any of the testcases
         if r_succ!(0) > r_succ!(1) {
             return false;
         }
-        // R_pred
         if st.0.graph.is_directed() && r_pred!(0) > r_pred!(1) {
             return false;
         }
-
-        // // semantic feasibility: compare associated data for nodes
         if NM::enabled() && !node_match.eq(st.0.graph, st.1.graph, nodes.0, nodes.1) {
             return false;
         }
-        // semantic feasibility: compare associated data for edges
         if EM::enabled() {
             macro_rules! edge_feasibility {
-                ($j:tt) => {{
+                ($ j : tt) => {{
                     for n_neigh in field!(st, $j)
                         .graph
                         .neighbors_directed(field!(nodes, $j), Outgoing)
@@ -411,7 +353,6 @@ mod matching {
                         if m_neigh == std::usize::MAX {
                             continue;
                         }
-
                         let e0 = (field!(nodes, $j), n_neigh);
                         let e1 = (
                             field!(nodes, 1 - $j),
@@ -432,13 +373,11 @@ mod matching {
                             .graph
                             .neighbors_directed(field!(nodes, $j), Incoming)
                         {
-                            // the self loop case is handled in outgoing
                             let m_neigh =
                                 field!(st, $j).mapping[field!(st, $j).graph.to_index(n_neigh)];
                             if m_neigh == std::usize::MAX {
                                 continue;
                             }
-
                             let e0 = (n_neigh, field!(nodes, $j));
                             let e1 = (
                                 field!(st, 1 - $j).graph.from_index(m_neigh),
@@ -457,13 +396,11 @@ mod matching {
                     }
                 }};
             }
-
             edge_feasibility!(0);
             edge_feasibility!(1);
         }
         true
     }
-
     fn next_candidate<G0, G1>(
         st: &mut (Vf2State<'_, G0>, Vf2State<'_, G1>),
     ) -> Option<(G0::NodeId, G1::NodeId, OpenList)>
@@ -474,22 +411,17 @@ mod matching {
         let mut from_index = None;
         let mut open_list = OpenList::Out;
         let mut to_index = st.1.next_out_index(0);
-
-        // Try the out list
         if to_index.is_some() {
             from_index = st.0.next_out_index(0);
             open_list = OpenList::Out;
         }
-        // Try the in list
         if to_index.is_none() || from_index.is_none() {
             to_index = st.1.next_in_index(0);
-
             if to_index.is_some() {
                 from_index = st.0.next_in_index(0);
                 open_list = OpenList::In;
             }
         }
-        // Try the other list -- disconnected graph
         if to_index.is_none() || from_index.is_none() {
             to_index = st.1.next_rest_index(0);
             if to_index.is_some() {
@@ -503,11 +435,9 @@ mod matching {
                 st.1.graph.from_index(m),
                 open_list,
             )),
-            // No more candidates
             _ => None,
         }
     }
-
     fn next_from_ix<G0, G1>(
         st: &mut (Vf2State<'_, G0>, Vf2State<'_, G1>),
         nx: G0::NodeId,
@@ -517,23 +447,21 @@ mod matching {
         G0: GetAdjacencyMatrix + GraphProp + NodeCompactIndexable + IntoNeighborsDirected,
         G1: GetAdjacencyMatrix + GraphProp + NodeCompactIndexable + IntoNeighborsDirected,
     {
-        // Find the next node index to try on the `from` side of the mapping
         let start = st.0.graph.to_index(nx) + 1;
         let cand0 = match open_list {
             OpenList::Out => st.0.next_out_index(start),
             OpenList::In => st.0.next_in_index(start),
             OpenList::Other => st.0.next_rest_index(start),
         }
-        .map(|c| c + start); // compensate for start offset.
+        .map(|c| c + start);
         match cand0 {
-            None => None, // no more candidates
+            None => None,
             Some(ix) => {
                 debug_assert!(ix >= start);
                 Some(st.0.graph.from_index(ix))
             }
         }
     }
-
     fn pop_state<G0, G1>(
         st: &mut (Vf2State<'_, G0>, Vf2State<'_, G1>),
         nodes: (G0::NodeId, G1::NodeId),
@@ -544,7 +472,6 @@ mod matching {
         st.0.pop_mapping(nodes.0);
         st.1.pop_mapping(nodes.1);
     }
-
     fn push_state<G0, G1>(
         st: &mut (Vf2State<'_, G0>, Vf2State<'_, G1>),
         nodes: (G0::NodeId, G1::NodeId),
@@ -555,8 +482,7 @@ mod matching {
         st.0.push_mapping(nodes.0, st.1.graph.to_index(nodes.1));
         st.1.push_mapping(nodes.1, st.0.graph.to_index(nodes.0));
     }
-
-    /// Return Some(bool) if isomorphism is decided, else None.
+    #[doc = " Return Some(bool) if isomorphism is decided, else None."]
     pub fn try_match<G0, G1, NM, EM>(
         st: &mut (Vf2State<'_, G0>, Vf2State<'_, G1>),
         node_match: &mut NM,
@@ -584,7 +510,6 @@ mod matching {
             None
         }
     }
-
     fn isomorphisms<G0, G1, NM, EM>(
         st: &mut (Vf2State<'_, G0>, Vf2State<'_, G1>),
         node_match: &mut NM,
@@ -609,16 +534,11 @@ mod matching {
         if st.0.is_complete() {
             return Some(st.0.mapping.clone());
         }
-
-        // A "depth first" search of a valid mapping from graph 1 to graph 2
-        // F(s, n, m) -- evaluate state s and add mapping n <-> m
-        // Find least T1out node (in st.out[1] but not in M[1])
         let mut result = None;
         while let Some(frame) = stack.pop() {
             match frame {
                 Frame::Unwind { nodes, open_list } => {
                     pop_state(st, nodes);
-
                     match next_from_ix(st, nodes.0, open_list) {
                         None => continue,
                         Some(nx) => {
@@ -646,7 +566,6 @@ mod matching {
                         if st.0.is_complete() {
                             result = Some(st.0.mapping.clone());
                         }
-                        // Check cardinalities of Tin, Tout sets
                         if (!match_subgraph
                             && st.0.out_size == st.1.out_size
                             && st.0.ins_size == st.1.ins_size)
@@ -679,7 +598,6 @@ mod matching {
         }
         result
     }
-
     pub struct GraphMatcher<'a, 'b, 'c, G0, G1, NM, EM>
     where
         G0: NodeCompactIndexable
@@ -701,7 +619,6 @@ mod matching {
         match_subgraph: bool,
         stack: Vec<Frame<G0, G1>>,
     }
-
     impl<'a, 'b, 'c, G0, G1, NM, EM> GraphMatcher<'a, 'b, 'c, G0, G1, NM, EM>
     where
         G0: NodeCompactIndexable
@@ -734,7 +651,6 @@ mod matching {
             }
         }
     }
-
     impl<'a, 'b, 'c, G0, G1, NM, EM> Iterator for GraphMatcher<'a, 'b, 'c, G0, G1, NM, EM>
     where
         G0: NodeCompactIndexable
@@ -751,7 +667,6 @@ mod matching {
         EM: EdgeMatcher<G0, G1>,
     {
         type Item = Vec<usize>;
-
         fn next(&mut self) -> Option<Self::Item> {
             isomorphisms(
                 &mut self.st,
@@ -761,15 +676,8 @@ mod matching {
                 &mut self.stack,
             )
         }
-
         fn size_hint(&self) -> (usize, Option<usize>) {
-            // To calculate the upper bound of results we use n! where n is the
-            // number of nodes in graph 1. n! values fit into a 64-bit usize up
-            // to n = 20, so we don't estimate an upper limit for n > 20.
             let n = self.st.0.graph.node_count();
-
-            // We hardcode n! values into an array that accounts for architectures
-            // with smaller usizes to get our upper bound.
             let upper_bounds: Vec<Option<usize>> = vec![
                 1u64,
                 1,
@@ -796,27 +704,24 @@ mod matching {
             .iter()
             .map(|n| usize::try_from(*n).ok())
             .collect();
-
             if n > upper_bounds.len() {
                 return (0, None);
             }
-
             (0, upper_bounds[n])
         }
     }
 }
-
-/// \[Generic\] Return `true` if the graphs `g0` and `g1` are isomorphic.
-///
-/// Using the VF2 algorithm, only matching graph syntactically (graph
-/// structure).
-///
-/// The graphs should not be multigraphs.
-///
-/// **Reference**
-///
-/// * Luigi P. Cordella, Pasquale Foggia, Carlo Sansone, Mario Vento;
-///   *A (Sub)Graph Isomorphism Algorithm for Matching Large Graphs*
+#[doc = " \\[Generic\\] Return `true` if the graphs `g0` and `g1` are isomorphic."]
+#[doc = ""]
+#[doc = " Using the VF2 algorithm, only matching graph syntactically (graph"]
+#[doc = " structure)."]
+#[doc = ""]
+#[doc = " The graphs should not be multigraphs."]
+#[doc = ""]
+#[doc = " **Reference**"]
+#[doc = ""]
+#[doc = " * Luigi P. Cordella, Pasquale Foggia, Carlo Sansone, Mario Vento;"]
+#[doc = "   *A (Sub)Graph Isomorphism Algorithm for Matching Large Graphs*"]
 pub fn is_isomorphic<G0, G1>(g0: G0, g1: G1) -> bool
 where
     G0: NodeCompactIndexable + EdgeCount + GetAdjacencyMatrix + GraphProp + IntoNeighborsDirected,
@@ -829,18 +734,16 @@ where
     if g0.node_count() != g1.node_count() || g0.edge_count() != g1.edge_count() {
         return false;
     }
-
     let mut st = (Vf2State::new(&g0), Vf2State::new(&g1));
     self::matching::try_match(&mut st, &mut NoSemanticMatch, &mut NoSemanticMatch, false)
         .unwrap_or(false)
 }
-
-/// \[Generic\] Return `true` if the graphs `g0` and `g1` are isomorphic.
-///
-/// Using the VF2 algorithm, examining both syntactic and semantic
-/// graph isomorphism (graph structure and matching node and edge weights).
-///
-/// The graphs should not be multigraphs.
+#[doc = " \\[Generic\\] Return `true` if the graphs `g0` and `g1` are isomorphic."]
+#[doc = ""]
+#[doc = " Using the VF2 algorithm, examining both syntactic and semantic"]
+#[doc = " graph isomorphism (graph structure and matching node and edge weights)."]
+#[doc = ""]
+#[doc = " The graphs should not be multigraphs."]
 pub fn is_isomorphic_matching<G0, G1, NM, EM>(
     g0: G0,
     g1: G1,
@@ -866,44 +769,42 @@ where
     if g0.node_count() != g1.node_count() || g0.edge_count() != g1.edge_count() {
         return false;
     }
-
     let mut st = (Vf2State::new(&g0), Vf2State::new(&g1));
     self::matching::try_match(&mut st, &mut node_match, &mut edge_match, false).unwrap_or(false)
 }
-
-/// \[Generic\] Return `true` if `g0` is isomorphic to a subgraph of `g1`.
-///
-/// Using the VF2 algorithm, only matching graph syntactically (graph
-/// structure).
-///
-/// The graphs should not be multigraphs.
-///
-/// # Subgraph isomorphism
-///
-/// (adapted from [`networkx` documentation](https://networkx.github.io/documentation/stable/reference/algorithms/isomorphism.vf2.html))
-///
-/// Graph theory literature can be ambiguous about the meaning of the above statement,
-/// and we seek to clarify it now.
-///
-/// In the VF2 literature, a mapping **M** is said to be a *graph-subgraph isomorphism*
-/// iff **M** is an isomorphism between **G2** and a subgraph of **G1**. Thus, to say
-/// that **G1** and **G2** are graph-subgraph isomorphic is to say that a subgraph of
-/// **G1** is isomorphic to **G2**.
-///
-/// Other literature uses the phrase ‘subgraph isomorphic’ as in
-/// ‘**G1** does not have a subgraph isomorphic to **G2**’. Another use is as an in adverb
-/// for isomorphic. Thus, to say that **G1** and **G2** are subgraph isomorphic is to say
-/// that a subgraph of **G1** is isomorphic to **G2**.
-///
-/// Finally, the term ‘subgraph’ can have multiple meanings. In this context,
-/// ‘subgraph’ always means a ‘node-induced subgraph’. Edge-induced subgraph
-/// isomorphisms are not directly supported. For subgraphs which are not
-/// induced, the term ‘monomorphism’ is preferred over ‘isomorphism’.
-///
-/// **Reference**
-///
-/// * Luigi P. Cordella, Pasquale Foggia, Carlo Sansone, Mario Vento;
-///   *A (Sub)Graph Isomorphism Algorithm for Matching Large Graphs*
+#[doc = " \\[Generic\\] Return `true` if `g0` is isomorphic to a subgraph of `g1`."]
+#[doc = ""]
+#[doc = " Using the VF2 algorithm, only matching graph syntactically (graph"]
+#[doc = " structure)."]
+#[doc = ""]
+#[doc = " The graphs should not be multigraphs."]
+#[doc = ""]
+#[doc = " # Subgraph isomorphism"]
+#[doc = ""]
+#[doc = " (adapted from [`networkx` documentation](https://networkx.github.io/documentation/stable/reference/algorithms/isomorphism.vf2.html))"]
+#[doc = ""]
+#[doc = " Graph theory literature can be ambiguous about the meaning of the above statement,"]
+#[doc = " and we seek to clarify it now."]
+#[doc = ""]
+#[doc = " In the VF2 literature, a mapping **M** is said to be a *graph-subgraph isomorphism*"]
+#[doc = " iff **M** is an isomorphism between **G2** and a subgraph of **G1**. Thus, to say"]
+#[doc = " that **G1** and **G2** are graph-subgraph isomorphic is to say that a subgraph of"]
+#[doc = " **G1** is isomorphic to **G2**."]
+#[doc = ""]
+#[doc = " Other literature uses the phrase ‘subgraph isomorphic’ as in"]
+#[doc = " ‘**G1** does not have a subgraph isomorphic to **G2**’. Another use is as an in adverb"]
+#[doc = " for isomorphic. Thus, to say that **G1** and **G2** are subgraph isomorphic is to say"]
+#[doc = " that a subgraph of **G1** is isomorphic to **G2**."]
+#[doc = ""]
+#[doc = " Finally, the term ‘subgraph’ can have multiple meanings. In this context,"]
+#[doc = " ‘subgraph’ always means a ‘node-induced subgraph’. Edge-induced subgraph"]
+#[doc = " isomorphisms are not directly supported. For subgraphs which are not"]
+#[doc = " induced, the term ‘monomorphism’ is preferred over ‘isomorphism’."]
+#[doc = ""]
+#[doc = " **Reference**"]
+#[doc = ""]
+#[doc = " * Luigi P. Cordella, Pasquale Foggia, Carlo Sansone, Mario Vento;"]
+#[doc = "   *A (Sub)Graph Isomorphism Algorithm for Matching Large Graphs*"]
 pub fn is_isomorphic_subgraph<G0, G1>(g0: G0, g1: G1) -> bool
 where
     G0: NodeCompactIndexable + EdgeCount + GetAdjacencyMatrix + GraphProp + IntoNeighborsDirected,
@@ -916,18 +817,16 @@ where
     if g0.node_count() > g1.node_count() || g0.edge_count() > g1.edge_count() {
         return false;
     }
-
     let mut st = (Vf2State::new(&g0), Vf2State::new(&g1));
     self::matching::try_match(&mut st, &mut NoSemanticMatch, &mut NoSemanticMatch, true)
         .unwrap_or(false)
 }
-
-/// \[Generic\] Return `true` if `g0` is isomorphic to a subgraph of `g1`.
-///
-/// Using the VF2 algorithm, examining both syntactic and semantic
-/// graph isomorphism (graph structure and matching node and edge weights).
-///
-/// The graphs should not be multigraphs.
+#[doc = " \\[Generic\\] Return `true` if `g0` is isomorphic to a subgraph of `g1`."]
+#[doc = ""]
+#[doc = " Using the VF2 algorithm, examining both syntactic and semantic"]
+#[doc = " graph isomorphism (graph structure and matching node and edge weights)."]
+#[doc = ""]
+#[doc = " The graphs should not be multigraphs."]
 pub fn is_isomorphic_subgraph_matching<G0, G1, NM, EM>(
     g0: G0,
     g1: G1,
@@ -953,17 +852,15 @@ where
     if g0.node_count() > g1.node_count() || g0.edge_count() > g1.edge_count() {
         return false;
     }
-
     let mut st = (Vf2State::new(&g0), Vf2State::new(&g1));
     self::matching::try_match(&mut st, &mut node_match, &mut edge_match, true).unwrap_or(false)
 }
-
-/// Using the VF2 algorithm, examine both syntactic and semantic graph
-/// isomorphism (graph structure and matching node and edge weights) and,
-/// if `g0` is isomorphic to a subgraph of `g1`, return the mappings between
-/// them.
-///
-/// The graphs should not be multigraphs.
+#[doc = " Using the VF2 algorithm, examine both syntactic and semantic graph"]
+#[doc = " isomorphism (graph structure and matching node and edge weights) and,"]
+#[doc = " if `g0` is isomorphic to a subgraph of `g1`, return the mappings between"]
+#[doc = " them."]
+#[doc = ""]
+#[doc = " The graphs should not be multigraphs."]
 pub fn subgraph_isomorphisms_iter<'a, G0, G1, NM, EM>(
     g0: &'a G0,
     g1: &'a G1,
@@ -991,7 +888,6 @@ where
     if g0.node_count() > g1.node_count() || g0.edge_count() > g1.edge_count() {
         return None;
     }
-
     Some(self::matching::GraphMatcher::new(
         g0, g1, node_match, edge_match, true,
     ))
