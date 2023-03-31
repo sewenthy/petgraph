@@ -106,16 +106,7 @@ where
         dist[graph.to_index(node)][graph.to_index(node)] = K::default();
     }
 
-    for k in 0..num_of_nodes {
-        for i in 0..num_of_nodes {
-            for j in 0..num_of_nodes {
-                let (result, overflow) = dist[i][k].overflowing_add(dist[k][j]);
-                if !overflow && dist[i][j] > result {
-                    dist[i][j] = result;
-                }
-            }
-        }
-    }
+    bar(num_of_nodes, &mut dist);
 
     // value less than 0(default value) indicates a negative cycle
     for i in 0..num_of_nodes {
@@ -134,4 +125,17 @@ where
     }
 
     Ok(distance_map)
+}
+
+fn bar<K>(num_of_nodes: usize, mut dist: &mut Vec<Vec<K>>) where K: BoundedMeasure + Copy {
+    for k in 0..num_of_nodes {
+        for i in 0..num_of_nodes {
+            for j in 0..num_of_nodes {
+                let (result, overflow) = dist[i][k].overflowing_add(dist[k][j]);
+                if !overflow && dist[i][j] > result {
+                    dist[i][j] = result;
+                }
+            }
+        }
+    }
 }
