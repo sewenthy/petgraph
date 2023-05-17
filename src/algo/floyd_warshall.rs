@@ -106,6 +106,7 @@ where
         dist[graph.to_index(node)][graph.to_index(node)] = K::default();
     }
 
+    /* START SELECTION */
     for k in 0..num_of_nodes {
         for i in 0..num_of_nodes {
             for j in 0..num_of_nodes {
@@ -116,6 +117,7 @@ where
             }
         }
     }
+    /* END SELECTION */
 
     // value less than 0(default value) indicates a negative cycle
     for i in 0..num_of_nodes {
