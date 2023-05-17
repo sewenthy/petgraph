@@ -783,9 +783,11 @@ where
     }
 
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        /* START SELECTION */
         self.inner
             .nth(n)
             .map(|(&(n1, n2), weight)| (n1, n2, weight))
+        /* END SELECTION */
     }
 
     fn last(self) -> Option<Self::Item> {
