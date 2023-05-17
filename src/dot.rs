@@ -173,6 +173,7 @@ where
             writeln!(f, "{}]", (self.get_node_attributes)(g, node))?;
         }
         // output all edges
+        /* START SELECTION */
         for (i, edge) in g.edge_references().enumerate() {
             write!(
                 f,
@@ -193,6 +194,7 @@ where
             }
             writeln!(f, "{}]", (self.get_edge_attributes)(g, edge)).unwrap();
         }
+        /* END SELECTION */
 
         if !self.config.GraphContentOnly {
             writeln!(f, "}}")?;
