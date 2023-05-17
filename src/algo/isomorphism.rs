@@ -72,12 +72,14 @@ mod state {
             // update T0 & T1 ins/outs
             // T0out: Node in G0 not in M0 but successor of a node in M0.
             // st.out[0]: Node either in M0 or successor of M0
+            /* START SELECTION */
             for ix in self.graph.neighbors_directed(from, Outgoing) {
                 if self.out[self.graph.to_index(ix)] == 0 {
                     self.out[self.graph.to_index(ix)] = self.generation;
                     self.out_size += 1;
                 }
             }
+            /* END SELECTION */
             if self.graph.is_directed() {
                 for ix in self.graph.neighbors_directed(from, Incoming) {
                     if self.ins[self.graph.to_index(ix)] == 0 {
