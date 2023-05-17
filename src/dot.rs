@@ -221,6 +221,8 @@ where
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let node_fmt = fmt::Debug::fmt;
         let edge_fmt = fmt::Debug::fmt;
+        // This is expected to fail because of type inference in IntelliJ
+        /* START SELECTION */
         let g = self.graph;
         if !self.config.GraphContentOnly {
             writeln!(f, "{} {{", TYPE[g.is_directed() as usize]).unwrap();
@@ -266,6 +268,7 @@ where
             writeln!(f, "}}").unwrap();
         }
         Ok(())
+        /* END SELECTION */
     }
 }
 
