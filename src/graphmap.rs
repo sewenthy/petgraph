@@ -663,6 +663,7 @@ where
         if Ty::is_directed() {
             let self_dir = self.dir;
             let start_node = self.start_node;
+            /* START SELECTION */
             (&mut self.iter)
                 .filter_map(move |&(n, dir)| {
                     if dir == self_dir || n == start_node {
@@ -672,6 +673,7 @@ where
                     }
                 })
                 .next()
+            /* END SELECTION */
         } else {
             self.iter.next().map(|&(n, _)| n)
         }
